@@ -1,74 +1,99 @@
-from pathlib import Path
-
 import pandas as pd
+from dash import Dash, html, dcc, Input, Output
 import plotly.express as px
-from dash import Dash, dcc, html
 
 
-DATA_FILE = Path("data") / "processed_data.csv"
-PRICE_INCREASE_DATE = "2021-01-15"
+# Load data
+df = pd.read_csv("data/processed_data.csv")
 
+# Convert date
+df["date"] = pd.to_datetime(df["date"])
 
-def load_sales_data() -> pd.DataFrame:
-    if not DATA_FILE.exists():
-        return pd.DataFrame(columns=["sales", "date", "region"])
-
-    data = pd.read_csv(DATA_FILE)
-    data["date"] = pd.to_datetime(data["date"])
-    data["sales"] = pd.to_numeric(data["sales"])
-    return data.sort_values("date")
-
-
-def build_sales_figure(data: pd.DataFrame):
-    if data.empty:
-        figure = px.line(labels={"date": "Date", "sales": "Sales"})
-        figure.add_annotation(
-            text=f"Missing dataset: {DATA_FILE}",
-            xref="paper",
-            yref="paper",
-            x=0.5,
-            y=0.5,
-            showarrow=False,
-        )
-    else:
-        figure = px.line(
-            data,
-            x="date",
-            y="sales",
-            labels={"date": "Date", "sales": "Sales"},
-            title="Pink Morsel Sales Over Time",
-        )
-
-    figure.add_vline(
-        x=PRICE_INCREASE_DATE,
-        line_dash="dash",
-        line_color="#d62728",
-        annotation_text="Price Increase",
-        annotation_position="top left",
-    )
-    figure.update_layout(
-        xaxis_title="Date",
-        yaxis_title="Sales",
-        margin={"l": 60, "r": 30, "t": 60, "b": 50},
-    )
-    return figure
+# Sort by date
+df = df.sort_values("date")
 
 
 app = Dash(__name__)
-sales_data = load_sales_data()
 
-app.layout = html.Main(
-    [
-        html.H1("Soul Foods Pink Morsel Sales Visualiser"),
-        dcc.Graph(id="sales-over-time", figure=build_sales_figure(sales_data)),
-    ],
-    style={
-        "maxWidth": "1100px",
-        "margin": "0 auto",
-        "padding": "32px 24px",
-        "fontFamily": "Arial, sans-serif",
-    },
+
+app.layout = html.Div(
+    className="container",
+    children=[
+
+        html.H1(
+            "Soul Foods Pink Morsel Sales Visualiser",
+            className="title"
+        ),
+
+        html.Div(
+            [
+                html.Label(
+                    "Select Region:",
+                    className="label"
+                ),
+
+                dcc.RadioItems(
+                    id="region-filter",
+                    options=[
+                        {"label": "All", "value": "all"},
+                        {"label": "North", "value": "north"},
+                        {"label": "East", "value": "east"},
+                        {"label": "South", "value": "south"},
+                        {"label": "West", "value": "west"},
+                    ],
+                    value="all",
+                    className="radio"
+                ),
+            ],
+            className="filter-box"
+        ),
+
+
+        dcc.Graph(
+            id="sales-chart",
+            className="chart"
+        )
+    ]
 )
+
+
+
+@app.callback(
+    Output("sales-chart", "figure"),
+    Input("region-filter", "value")
+)
+
+def update_chart(region):
+
+    if region == "all":
+        filtered = df
+    else:
+        filtered = df[
+            df["region"].str.lower() == region
+        ]
+
+
+    fig = px.line(
+        filtered,
+        x="date",
+        y="sales",
+        title="Pink Morsel Sales Over Time",
+        labels={
+            "date": "Date",
+            "sales": "Sales"
+        }
+    )
+
+
+    fig.add_vline(
+        x="2021-01-15",
+        line_dash="dash",
+        annotation_text="Price Increase"
+    )
+
+
+    return fig
+
 
 
 if __name__ == "__main__":
