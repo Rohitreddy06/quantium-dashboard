@@ -19,11 +19,18 @@ def load_source_data() -> pd.DataFrame:
             f"Expected exactly 3 source CSV files in {DATA_DIR}, found {len(csv_files)}."
         )
 
+    empty_files = [path for path in csv_files if path.stat().st_size == 0]
+    if empty_files:
+        file_names = ", ".join(path.name for path in empty_files)
+        raise ValueError(f"Source CSV files are empty: {file_names}")
+
     return pd.concat((pd.read_csv(path) for path in csv_files), ignore_index=True)
 
 
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
-    pink_morsels = data.loc[data["product"] == PRODUCT_NAME].copy()
+    pink_morsels = data.loc[
+        data["product"].astype(str).str.casefold() == PRODUCT_NAME.casefold()
+    ].copy()
     price = pink_morsels["price"].astype(str).str.replace("$", "", regex=False)
     pink_morsels["sales"] = pink_morsels["quantity"] * pd.to_numeric(price)
 
